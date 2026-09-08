@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -24,10 +25,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import cn.buddykeymanager.app.BuildConfig
+import cn.buddykeymanager.app.net.ReleaseInfo
+import cn.buddykeymanager.app.net.UpdateResult
+import cn.buddykeymanager.app.net.Updater
 import cn.buddykeymanager.app.store.CredentialStore
 import cn.buddykeymanager.app.theme.AppColors
 import cn.buddykeymanager.app.theme.CardBackground
 import cn.buddykeymanager.app.theme.PageBackground
+import kotlinx.coroutines.delay
 
 private data class TabItem(val title: String, val icon: String)
 
@@ -46,6 +52,14 @@ fun AppRoot() {
     var tab by remember { mutableStateOf(0) }
     var detailSessionId by remember { mutableStateOf<String?>(null) }
     var detailCredUid by remember { mutableStateOf<String?>(null) }
+    var updateInfo by remember { mutableStateOf<ReleaseInfo?>(null) }
+
+    // 启动后静默检查更新
+    LaunchedEffect(Unit) {
+        delay(1500)
+        val r = Updater.check(BuildConfig.VERSION_NAME)
+        if (r is UpdateResult.Available) updateInfo = r.release
+    }
 
     // 详情页数据源（若已被删除则自动回退）
     val openSession = detailSessionId?.let { id -> sessions.firstOrNull { it.id == id } }
@@ -56,34 +70,45 @@ fun AppRoot() {
         detailCredUid = null
     }
 
-    when {
-        openSession != null -> {
-            SessionDetailScreen(session = openSession) {
-                detailSessionId = null
-            }
-        }
-        openCred != null -> {
-            CredentialDetailScreen(cred = openCred) {
-                detailCredUid = null
-            }
-        }
-        else -> {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(PageBackground)
-                    .statusBarsPadding()
-            ) {
-                Box(Modifier.weight(1f)) {
-                    when (tab) {
-                        0 -> SessionsScreen(onOpenSession = { detailSessionId = it })
-                        1 -> CredentialsScreen(onOpenCred = { detailCredUid = it })
-                        2 -> LogScreen()
-                        else -> SettingsScreen()
-                    }
+    Box(Modifier.fillMaxSize()) {
+        when {
+            openSession != null -> {
+                SessionDetailScreen(session = openSession) {
+                    detailSessionId = null
                 }
-                BottomBar(selected = tab, onSelect = { tab = it })
             }
+            openCred != null -> {
+                CredentialDetailScreen(cred = openCred) {
+                    detailCredUid = null
+                }
+            }
+            else -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(PageBackground)
+                        .statusBarsPadding()
+                ) {
+                    Box(Modifier.weight(1f)) {
+                        when (tab) {
+                            0 -> SessionsScreen(onOpenSession = { detailSessionId = it })
+                            1 -> CredentialsScreen(onOpenCred = { detailCredUid = it })
+                            2 -> LogScreen()
+                            else -> SettingsScreen()
+                        }
+                    }
+                    BottomBar(selected = tab, onSelect = { tab = it })
+                }
+            }
+        }
+
+        updateInfo?.let { info ->
+            UpdateDialog(
+                version = info.tagName,
+                notes = info.body,
+                url = if (info.htmlUrl.isNotEmpty()) info.htmlUrl else "https://github.com/turbomind66/BuddyKeyManager-Android/releases/latest",
+                onDismiss = { updateInfo = null }
+            )
         }
     }
 }
