@@ -1,7 +1,5 @@
 package cn.buddykeymanager.app.ui
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -15,24 +13,36 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import cn.buddykeymanager.app.BuildConfig
+import cn.buddykeymanager.app.net.ReleaseInfo
+import cn.buddykeymanager.app.net.UpdateResult
+import cn.buddykeymanager.app.net.Updater
 import cn.buddykeymanager.app.store.Prefs
 import cn.buddykeymanager.app.store.SmsStore
 import cn.buddykeymanager.app.theme.AppColors
 import cn.buddykeymanager.app.theme.SecondaryBackground
+import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen() {
@@ -43,8 +53,28 @@ fun SettingsScreen() {
     val cardType by Prefs.smsCardType.collectAsState()
     val pushBaseURL by Prefs.pushBaseURL.collectAsState()
     val pushPassword by Prefs.pushPassword.collectAsState()
+    val githubToken by Prefs.githubToken.collectAsState()
     val balance by SmsStore.balance.collectAsState()
     val balanceUpdatedAt by SmsStore.balanceUpdatedAt.collectAsState()
+
+    var checking by remember { mutableStateOf(false) }
+    var updateRelease by remember { mutableStateOf<ReleaseInfo?>(null) }
+    var updateMsg by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    fun doCheckUpdate() {
+        if (checking) return
+        checking = true
+        scope.launch {
+            val r = Updater.check(BuildConfig.VERSION_NAME)
+            checking = false
+            when (r) {
+                is UpdateResult.Available -> updateRelease = r.release
+                is UpdateResult.UpToDate -> updateMsg = "已是最新版本 v${BuildConfig.VERSION_NAME}"
+                is UpdateResult.Failed -> updateMsg = r.message
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -150,16 +180,29 @@ fun SettingsScreen() {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("🔐 BuddyKeyManager", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 Spacer(Modifier.weight(1f))
-                Text("v1.0", fontSize = 11.sp, color = AppColors.brand, modifier = Modifier
-                    .clip(RoundedCornerShape(50))
-                    .background(AppColors.brand.copy(alpha = 0.12f))
-                    .padding(horizontal = 8.dp, vertical = 3.dp))
+                Text(
+                    "v${BuildConfig.VERSION_NAME}",
+                    fontSize = 11.sp,
+                    color = AppColors.brand,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(AppColors.brand.copy(alpha = 0.12f))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                )
             }
             Spacer(Modifier.height(8.dp))
             Text("WorkBuddy / CodeBuddy OAuth 密钥管理器 · 无痕登录 / 接码 / 凭证管理", fontSize = 12.sp, color = Color.Gray)
             Spacer(Modifier.height(12.dp))
+
+            BrandButton(
+                text = if (checking) "检查中…" else "检查更新",
+                enabled = !checking,
+                onClick = { doCheckUpdate() }
+            )
+            Spacer(Modifier.height(8.dp))
+
             Text(
-                "查看更新 · 下载最新版",
+                "GitHub 仓库 · 手动下载",
                 color = Color.White,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 14.sp,
@@ -167,13 +210,39 @@ fun SettingsScreen() {
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
                     .background(AppColors.brandGradient)
-                    .clickable { openReleasePage() }
-                    .padding(vertical = 14.dp)
-                    .let { it },
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    .clickable { openUrl("https://github.com/turbomind66/BuddyKeyManager-Android/releases/latest") }
+                    .padding(vertical = 14.dp),
+                textAlign = TextAlign.Center
             )
+            Spacer(Modifier.height(12.dp))
+
+            LabeledField("GitHub Token（私有仓库检查更新用）", githubToken, "可选：填入只读 Token", password = true) { Prefs.setGithubToken(it) }
+            Spacer(Modifier.height(4.dp))
+            Text("仓库为私有，检查更新需配置只读 Token；留空则尝试公开访问", fontSize = 11.sp, color = Color.Gray)
         }
         Spacer(Modifier.height(24.dp))
+    }
+
+    // 发现新版本弹窗
+    updateRelease?.let { info ->
+        UpdateDialog(
+            version = info.tagName,
+            notes = info.body,
+            url = if (info.htmlUrl.isNotEmpty()) info.htmlUrl else "https://github.com/turbomind66/BuddyKeyManager-Android/releases/latest",
+            onDismiss = { updateRelease = null }
+        )
+    }
+
+    // 检查结果提示弹窗（已最新 / 失败）
+    updateMsg?.let { msg ->
+        AlertDialog(
+            onDismissRequest = { updateMsg = null },
+            title = { Text("检查更新") },
+            text = { Text(msg, fontSize = 13.sp, color = Color.Gray) },
+            confirmButton = {
+                TextButton(onClick = { updateMsg = null }) { Text("知道了", color = AppColors.brand) }
+            }
+        )
     }
 }
 
@@ -203,13 +272,5 @@ private fun LabeledField(
             textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp),
             modifier = Modifier.fillMaxWidth()
         )
-    }
-}
-
-private fun openReleasePage() {
-    runCatching {
-        val i = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Admin6016/BuddyKeyManager/releases/latest"))
-        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        Prefs.context().startActivity(i)
     }
 }
