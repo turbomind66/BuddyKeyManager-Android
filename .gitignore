@@ -1,0 +1,51 @@
+# Android build outputs
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+/bin/
+/app/build/
+/build/
+/captures/
+/.cxx/
+/app/release/
+/app/debug/
+
+# Gradle
+.gradle/
+gradle-app.setting
+!gradle-wrapper.jar
+.gradletasknamecache
+
+# Local SDK
+local.properties
+*.iml
+.idea/
+*.iws
+*.ipr
+out/
+
+# Native build
+.externalNativeBuild/
+*.so
+
+# Keystore (do NOT commit signing material)
+*.jks
+*.keystore
+release.keystore.properties
+
+# OS junk
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Logcat
+*.log
+
+# Workspace build artifacts (delivered separately as GitHub Release)
+/dist/
+
+# Cloud sync placeholders (Baidu Netdisk creates these during upload)
+/*.baiduyun.uploading.cfg
