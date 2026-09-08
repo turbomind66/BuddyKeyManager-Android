@@ -39,6 +39,8 @@ object Prefs {
     val pushBaseURL: MutableStateFlow<String> = MutableStateFlow("")
     val pushPassword: MutableStateFlow<String> = MutableStateFlow("")
 
+    val githubToken: MutableStateFlow<String> = MutableStateFlow("")
+
     fun init(ctx: Context) {
         appCtx = ctx.applicationContext
         region.value = sp.getString("region", "cn") ?: "cn"
@@ -58,6 +60,7 @@ object Prefs {
         smsAutoMode.value = sp.getBoolean("sms_auto_mode", false)
         pushBaseURL.value = sp.getString("push_baseurl", "") ?: ""
         pushPassword.value = sp.getString("push_password", "") ?: ""
+        githubToken.value = sp.getString("github_token", "") ?: ""
     }
 
     fun context(): Context = appCtx
@@ -84,4 +87,5 @@ object Prefs {
     fun setSmsAutoMode(v: Boolean) { smsAutoMode.value = v; sp.edit().putBoolean("sms_auto_mode", v).apply() }
     fun setPushBaseURL(v: String) { pushBaseURL.value = v; sp.edit().putString("push_baseurl", v).apply() }
     fun setPushPassword(v: String) { pushPassword.value = v; sp.edit().putString("push_password", v).apply() }
+    fun setGithubToken(v: String) { githubToken.value = v; sp.edit().putString("github_token", v).apply() }
 }
