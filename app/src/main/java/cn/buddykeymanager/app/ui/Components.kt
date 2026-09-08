@@ -232,3 +232,47 @@ fun fmtDateTimeMillis(ms: Long): String =
 fun fmtExpiry(tsSec: Long): String =
     if (tsSec <= 0) "—"
     else SimpleDateFormat("MM-dd HH:mm", Locale.CHINA).format(Date(tsSec * 1000))
+
+// MARK: - 打开外部链接
+
+fun openUrl(url: String) {
+    runCatching {
+        val i = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+        i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        cn.buddykeymanager.app.store.Prefs.context().startActivity(i)
+    }
+}
+
+// MARK: - 更新提示对话框
+
+@Composable
+fun UpdateDialog(
+    version: String,
+    notes: String,
+    url: String,
+    onDismiss: () -> Unit
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("发现新版本 $version") },
+        text = {
+            Column {
+                Text(
+                    if (notes.isBlank()) "新版本已发布，点击下方「去下载」获取更新。" else notes,
+                    fontSize = 13.sp,
+                    color = Color.Gray,
+                    lineHeight = 18.sp
+                )
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = {
+                onDismiss()
+                openUrl(url)
+            }) { Text("去下载", color = AppColors.brand, fontWeight = FontWeight.Bold) }
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) { Text("取消", color = Color.Gray) }
+        }
+    )
+}
